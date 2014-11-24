@@ -73,6 +73,11 @@ def send_tweet(text):
     logger.info(u'Sent: {}'.format(text))
 
 
+def queue(text):
+    """Queue the text to tweet out."""
+    print 'Queueing: {}'.format(text)
+
+
 def do_something():
     headlines = build_headlines()
     maybe_better_headlines = []
@@ -86,12 +91,31 @@ def do_something():
             maybe_better_headlines.append(new_text)
 
     # see which of these headlines are new
+    new_headlines = []
+    old_headlines = []
     for text in maybe_better_headlines:
         key = 'headline:{}'.format(text)
         count = rdb.incr(key)
         rdb.expire(key, 3600)
         if count == 1:  # first time it was seen
-            print text
+            new_headlines.append(text)
+        else:
+            old_headlines.append(text)
+
+    print 'Which Headlines are worth tweeting?'
+    print '-' * 80
+    for idx, text in enumerate(maybe_better_headlines, start=1):
+        print '\t', idx, text
+    print '-' * 80
+    while True:
+        out = raw_input('> (return to exit) ')
+        if out:
+            try:
+                queue(maybe_better_headlines[int(out) - 1])
+            except (IndexError, ValueError):
+                out = 'foo'
+        else:
+            break
 
 
 if __name__ == '__main__':
