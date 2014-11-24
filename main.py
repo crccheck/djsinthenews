@@ -31,6 +31,7 @@ if not len(logger.handlers):
 # copied from https://github.com/crccheck/dj.js/blob/master/Source/content_script.js
 DJ_SEARCH = re.compile(r'\b([Aa]uthor|[Dd]octor|[Ee]xpert|[Ff]armer|[Ll]awyer|[Mm]ayor|[Pp]resident|[Ss]cientist|[Ss]enator|[Vv]eteran|Pope)(|s)\b')
 EXPIRES = 3600 * 24 * 7  # remember things for a week
+QUEUE_KEY = 'tweets'
 
 
 def build_headlines(url='https://news.google.com/'):
@@ -75,10 +76,8 @@ def send_tweet(text):
 
 def queue(rdb, text):
     """Queue the text to tweet out."""
-    list_key = 'tweets'
     print 'Queueing: {}'.format(text)
-    rdb.lpush(list_key, text)
-    print rdb.llen(list_key)
+    rdb.lpush(QUEUE_KEY, text)
 
 
 def do_something():
@@ -107,18 +106,25 @@ def do_something():
 
     print 'Which Headlines are worth tweeting?'
     print '-' * 80
-    for idx, text in enumerate(maybe_better_headlines, start=1):
+    for idx, text in enumerate(new_headlines, start=1):
         print '\t', idx, text
     print '-' * 80
     while True:
         out = raw_input('> (return to exit) ')
         if out:
             try:
-                queue(rdb, maybe_better_headlines[int(out) - 1])
+                queue(rdb, new_headlines[int(out) - 1])
             except (IndexError, ValueError):
                 out = 'foo'
         else:
             break
+
+    # send tweet off the queue
+    n_queue = rdb.llen(QUEUE_KEY)
+    if n_queue:
+        send_tweet(rdb.lpop(QUEUE_KEY))
+        print 'Tweets in the queue: {}'.format(n_queue - 1)
+
     print rdb.keys('*')  # DELETEME
 
 
