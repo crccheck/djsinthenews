@@ -73,9 +73,12 @@ def send_tweet(text):
     logger.info(u'Sent: {}'.format(text))
 
 
-def queue(text):
+def queue(rdb, text):
     """Queue the text to tweet out."""
+    list_key = 'tweets'
     print 'Queueing: {}'.format(text)
+    rdb.lpush(list_key, text)
+    print rdb.llen(list_key)
 
 
 def do_something():
@@ -111,11 +114,12 @@ def do_something():
         out = raw_input('> (return to exit) ')
         if out:
             try:
-                queue(maybe_better_headlines[int(out) - 1])
+                queue(rdb, maybe_better_headlines[int(out) - 1])
             except (IndexError, ValueError):
                 out = 'foo'
         else:
             break
+    print rdb.keys('*')  # DELETEME
 
 
 if __name__ == '__main__':
