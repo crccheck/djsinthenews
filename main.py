@@ -106,7 +106,7 @@ def do_something():
         if not rdb.get(key):
             possible_tweets.append('{} {}'.format(text, url))
             rdb.set(key, url)
-            rdb.expire(key, 3600)
+            rdb.expire(key, EXPIRES)
 
     # have a human pick a tweet
     if possible_tweets:
