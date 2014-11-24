@@ -14,12 +14,10 @@ import logging
 import re
 import sys
 
-from pymarkovchain import MarkovChain
+from lxml.html import document_fromstring
 import project_runpy
 import requests
 import tweepy
-
-from walk import walk
 
 
 logger = logging.getLogger(__name__)
@@ -29,28 +27,14 @@ if not len(logger.handlers):
     logger.addHandler(project_runpy.ColorizingStreamHandler())
 
 
-def build_comments(url):
-    if url[-1] != '/':
-        url += '/'
-    page = requests.get(url)
-    content_type = page.headers['Content-Type']
-    if 'application/rss' in content_type:
-        from rss import rss
-        return rss(page)
-    return walk(page)
-
-
-def clean_comments(comments):
-    for comment in comments:
-        if 'http' in comment:
-            # throw away comments with urls
-            continue
-        if 'trib' in comment.lower():
-            # throw away comments that might directly reference us (4th wall)
-            continue
-        # add a zero width space, \u200b, to keep mentions and hash tags out
-        text = re.sub(r'([@#])(\w)', u'\\1\u200b\\2', comment)
-        yield text
+def build_headlines(url='https://news.google.com/'):
+    page = requests.get(url, headers={
+        'User-Agent': 'djs-everywhere/0.0.0 (c@crccheck.com)',
+    })
+    doc = document_fromstring(page.content)
+    headlines = [x.text_content().strip() for x in
+        doc.xpath('//span[@class="titletext"]')]
+    return set(headlines)  # make sure they're unique
 
 
 def get_tweet_text(mc):
@@ -83,35 +67,35 @@ def send_tweet(text):
     logger.info(u'Sent: {}'.format(text))
 
 
-def do_something(host):
-    comments = build_comments(host)
-    cleaned = list(clean_comments(comments))
+def do_something():
+    build_headlines()
+    # cleaned = list(clean_comments(comments))
 
-    if len(cleaned) < 20:
-        # if we don't have enough comments, leave
-        logger.error('Not enough comments on {}, only got {} ({}), needed 20'
-            .format(host, len(cleaned), len(comments)))
-        return
+    # if len(cleaned) < 20:
+    #     # if we don't have enough comments, leave
+    #     logger.error('Not enough comments on {}, only got {} ({}), needed 20'
+    #         .format(host, len(cleaned), len(comments)))
+    #     return
 
-    mc = MarkovChain('/tmp/temp.db')
-    mc.db = {}  # HACK to clear any existing data, we want to stay fresh
-    mc.generateDatabase(
-        # seems silly to join and then immediately split, but oh well
-        '\n'.join(cleaned),
-        sentenceSep='[\n]',
-    )
-    if 'send' in sys.argv:
-        send_tweet(get_tweet_text(mc))
-    else:
-        print get_tweet_text(mc)
-        # put stuff in global for debugging
-        globals().update({
-            'mc': mc,
-            'comments': comments,
-            'cleaned': cleaned,
-            'host': host,
-        })
+    # mc = MarkovChain('/tmp/temp.db')
+    # mc.db = {}  # HACK to clear any existing data, we want to stay fresh
+    # mc.generateDatabase(
+    #     # seems silly to join and then immediately split, but oh well
+    #     '\n'.join(cleaned),
+    #     sentenceSep='[\n]',
+    # )
+    # if 'send' in sys.argv:
+    #     send_tweet(get_tweet_text(mc))
+    # else:
+    #     print get_tweet_text(mc)
+    #     # put stuff in global for debugging
+    #     globals().update({
+    #         'mc': mc,
+    #         'comments': comments,
+    #         'cleaned': cleaned,
+    #         'host': host,
+    #     })
 
 
 if __name__ == '__main__':
-    do_something(sys.argv[1])
+    do_something()
