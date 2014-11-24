@@ -77,7 +77,7 @@ def send_tweet(text):
         env.get('ACCESS_KEY'), env.get('ACCESS_SECRET'))
     api = tweepy.API(auth)
     api.update_status(text)
-    logger.info('Sent: {} ({})'.format(text, len(text)))
+    logger.info(u'Sent: {} ({})'.format(text, len(text)))
 
 
 def queue(rdb, text):
