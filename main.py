@@ -27,6 +27,10 @@ if not len(logger.handlers):
     logger.addHandler(project_runpy.ColorizingStreamHandler())
 
 
+# copied from https://github.com/crccheck/dj.js/blob/master/Source/content_script.js
+DJ_SEARCH = re.compile(r'\b([Aa]uthor|[Dd]octor|[Ee]xpert|[Ff]armer|[Ll]awyer|[Mm]ayor|[Pp]resident|[Ss]cientist|[Ss]enator|[Vv]eteran|Pope)(|s)\b')
+
+
 def build_headlines(url='https://news.google.com/'):
     page = requests.get(url, headers={
         'User-Agent': 'djs-everywhere/0.0.0 (c@crccheck.com)',
@@ -68,33 +72,14 @@ def send_tweet(text):
 
 
 def do_something():
-    build_headlines()
-    # cleaned = list(clean_comments(comments))
-
-    # if len(cleaned) < 20:
-    #     # if we don't have enough comments, leave
-    #     logger.error('Not enough comments on {}, only got {} ({}), needed 20'
-    #         .format(host, len(cleaned), len(comments)))
-    #     return
-
-    # mc = MarkovChain('/tmp/temp.db')
-    # mc.db = {}  # HACK to clear any existing data, we want to stay fresh
-    # mc.generateDatabase(
-    #     # seems silly to join and then immediately split, but oh well
-    #     '\n'.join(cleaned),
-    #     sentenceSep='[\n]',
-    # )
-    # if 'send' in sys.argv:
-    #     send_tweet(get_tweet_text(mc))
-    # else:
-    #     print get_tweet_text(mc)
-    #     # put stuff in global for debugging
-    #     globals().update({
-    #         'mc': mc,
-    #         'comments': comments,
-    #         'cleaned': cleaned,
-    #         'host': host,
-    #     })
+    headlines = build_headlines()
+    maybe_better_headlines = []
+    for text in headlines:
+        new_text, count = DJ_SEARCH.subn('DJ\\2', text)
+        print count, new_text
+        if count:
+            maybe_better_headlines.append(new_text)
+    print maybe_better_headlines
 
 
 if __name__ == '__main__':
