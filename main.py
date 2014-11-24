@@ -1,11 +1,10 @@
 """
 Usage:
-  python main.py URL [send]
+  python main.py [send]
 
 Options:
 
-  URL   some url, like http://example.com
-  send  send a tweet (requires Twitter Oauth credentials)
+  send  send a tweet (requires Twitter auth credentials)
 """
 from __future__ import unicode_literals
 
@@ -35,13 +34,20 @@ QUEUE_KEY = 'tweets'
 
 
 def build_headlines(url='https://news.google.com/'):
+    # with open('index.html') as f:
+    #     doc = document_fromstring(f.read())
     page = requests.get(url, headers={
         'User-Agent': 'djs-everywhere/0.0.0 (c@crccheck.com)',
     })
     doc = document_fromstring(page.content)
-    headlines = [x.text_content().strip() for x in
-        doc.xpath('//span[@class="titletext"]')]
-    return set(headlines)  # make sure they're unique
+    headlines = {}
+    for headline in doc.xpath('//a/span[@class="titletext"]'):
+        # lxml returns byte string
+        key = unicode(headline.text_content().strip())
+        # WISHLIST strip google news get params
+        url = headline.getparent().attrib['href']
+        headlines[key] = url
+    return headlines
 
 
 def get_tweet_text(mc):
@@ -71,7 +77,7 @@ def send_tweet(text):
         env.get('ACCESS_KEY'), env.get('ACCESS_SECRET'))
     api = tweepy.API(auth)
     api.update_status(text)
-    logger.info(u'Sent: {}'.format(text))
+    logger.info('Sent: {} ({})'.format(text, len(text)))
 
 
 def queue(rdb, text):
@@ -82,49 +88,61 @@ def queue(rdb, text):
 
 def do_something():
     headlines = build_headlines()
-    maybe_better_headlines = []
+    maybe_better_headlines = {}
 
     r_url = env.require('REDISCLOUD_URL')
     rdb = redis.StrictRedis.from_url(r_url)
 
-    for text in headlines:
+    for text, url in headlines.items():
         new_text, count = DJ_SEARCH.subn('DJ\\2', text)
         if count:
-            maybe_better_headlines.append(new_text)
+            maybe_better_headlines[new_text] = url
 
     # see which of these headlines are new
-    new_headlines = []
-    old_headlines = []
-    for text in maybe_better_headlines:
+    possible_tweets = []
+    for text, url in maybe_better_headlines.items():
+        # TODO hash text so keys aren't so long and unpredictable
         key = 'headline:{}'.format(text)
-        count = rdb.incr(key)
-        rdb.expire(key, 3600)
-        if count == 1:  # first time it was seen
-            new_headlines.append(text)
-        else:
-            old_headlines.append(text)
+        if not rdb.get(key):
+            possible_tweets.append('{} {}'.format(text, url))
+            rdb.set(key, url)
+            rdb.expire(key, 3600)
 
-    print 'Which Headlines are worth tweeting?'
-    print '-' * 80
-    for idx, text in enumerate(new_headlines, start=1):
-        print '\t', idx, text
-    print '-' * 80
-    while True:
-        out = raw_input('> (return to exit) ')
-        if out:
-            try:
-                queue(rdb, new_headlines[int(out) - 1])
-            except (IndexError, ValueError):
-                out = 'foo'
-        else:
-            break
+    # have a human pick a tweet
+    if possible_tweets:
+        print 'Which headlines are worth tweeting?'
+        print '-' * 80
+        for idx, text in enumerate(possible_tweets, start=1):
+            print '\t', idx, text
+        print '-' * 80
+        while True:
+            out = raw_input('> (return to exit) ')
+            if out:
+                try:
+                    queue(rdb, possible_tweets[int(out) - 1])
+                except (IndexError, ValueError):
+                    out = 'foo'
+            else:
+                break
 
     # send tweet off the queue
-    n_queue = rdb.llen(QUEUE_KEY)
-    if n_queue:
-        send_tweet(rdb.lpop(QUEUE_KEY))
-        print 'Tweets in the queue: {}'.format(n_queue - 1)
+    if 'send' in sys.argv[1:]:
+        n_queue = rdb.llen(QUEUE_KEY)
+        if n_queue:
+            text = rdb.lpop(QUEUE_KEY)
+            try:
+                send_tweet(text)
+            except tweepy.TweepError as e:
+                # code 226 - this request looks like it might be automated
+                rdb.lpush(text)
+                import ipdb; ipdb.set_trace()
+            print 'Tweets in the queue: {}'.format(n_queue - 1)
 
+    # DELETEME below, just for debuggin
+    print 'queue:'
+    from pprint import pprint
+    pprint(list(rdb.lrange(QUEUE_KEY, 0, -1)))  # DELETEME
+    print 'all keys:'
     print rdb.keys('*')  # DELETEME
 
 
