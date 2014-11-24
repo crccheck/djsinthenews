@@ -8,6 +8,7 @@ Options:
 """
 from __future__ import unicode_literals
 
+from hashlib import md5
 import logging
 import re
 import sys
@@ -101,8 +102,7 @@ def do_something():
     # see which of these headlines are new
     possible_tweets = []
     for text, url in maybe_better_headlines.items():
-        # TODO hash text so keys aren't so long and unpredictable
-        key = 'headline:{}'.format(text)
+        key = 'headline:{}'.format(md5(text.encode('utf8')).hexdigest())
         if not rdb.get(key):
             possible_tweets.append('{} {}'.format(text, url))
             rdb.set(key, url)
