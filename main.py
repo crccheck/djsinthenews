@@ -78,7 +78,7 @@ def send_tweet(text):
         env.get('ACCESS_KEY'), env.get('ACCESS_SECRET'))
     api = tweepy.API(auth)
     api.update_status(text)
-    logger.info(u'Sent: {} ({})'.format(text, len(text)))
+    logger.info(u'Sent: {} ({})'.format(text.encode('ascii', errors='ignore'), len(text)))
 
 
 def queue(rdb, text):
@@ -134,7 +134,7 @@ def do_something():
                 send_tweet(text)
             except tweepy.TweepError as e:
                 # code 226 - this request looks like it might be automated
-                rdb.rpush(text)
+                rdb.lpush(text)
                 import ipdb; ipdb.set_trace()
             print 'Tweets in the queue: {}'.format(n_queue - 1)
 
@@ -142,8 +142,6 @@ def do_something():
     print 'queue:'
     from pprint import pprint
     pprint(list(rdb.lrange(QUEUE_KEY, 0, -1)))  # DELETEME
-    print 'all keys:'
-    print rdb.keys('*')  # DELETEME
 
 
 if __name__ == '__main__':
