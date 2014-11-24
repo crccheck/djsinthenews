@@ -9,13 +9,14 @@ Options:
 """
 from __future__ import unicode_literals
 
-from os import environ as env
 import logging
 import re
 import sys
 
 from lxml.html import document_fromstring
+from project_runpy import env
 import project_runpy
+import redis
 import requests
 import tweepy
 
@@ -29,6 +30,7 @@ if not len(logger.handlers):
 
 # copied from https://github.com/crccheck/dj.js/blob/master/Source/content_script.js
 DJ_SEARCH = re.compile(r'\b([Aa]uthor|[Dd]octor|[Ee]xpert|[Ff]armer|[Ll]awyer|[Mm]ayor|[Pp]resident|[Ss]cientist|[Ss]enator|[Vv]eteran|Pope)(|s)\b')
+EXPIRES = 3600 * 24 * 7  # remember things for a week
 
 
 def build_headlines(url='https://news.google.com/'):
@@ -74,12 +76,22 @@ def send_tweet(text):
 def do_something():
     headlines = build_headlines()
     maybe_better_headlines = []
+
+    r_url = env.require('REDISCLOUD_URL')
+    rdb = redis.StrictRedis.from_url(r_url)
+
     for text in headlines:
         new_text, count = DJ_SEARCH.subn('DJ\\2', text)
-        print count, new_text
         if count:
             maybe_better_headlines.append(new_text)
-    print maybe_better_headlines
+
+    # see which of these headlines are new
+    for text in maybe_better_headlines:
+        key = 'headline:{}'.format(text)
+        count = rdb.incr(key)
+        rdb.expire(key, 3600)
+        if count == 1:  # first time it was seen
+            print text
 
 
 if __name__ == '__main__':
