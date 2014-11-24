@@ -83,7 +83,7 @@ def send_tweet(text):
 def queue(rdb, text):
     """Queue the text to tweet out."""
     print 'Queueing: {}'.format(text)
-    rdb.lpush(QUEUE_KEY, text)
+    rdb.rpush(QUEUE_KEY, text)
 
 
 def do_something():
@@ -134,7 +134,7 @@ def do_something():
                 send_tweet(text)
             except tweepy.TweepError as e:
                 # code 226 - this request looks like it might be automated
-                rdb.lpush(text)
+                rdb.rpush(text)
                 import ipdb; ipdb.set_trace()
             print 'Tweets in the queue: {}'.format(n_queue - 1)
 
