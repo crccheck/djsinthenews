@@ -1,10 +1,12 @@
 """
 Usage:
   python main.py [send]
+  python main.py only-send
 
 Options:
 
-  send  send a tweet (requires Twitter auth credentials)
+  send       send a tweet (requires Twitter auth credentials)
+  only-send  send a tweet and don't look for headlines. Useful for cron jobs.
 """
 from __future__ import unicode_literals
 
@@ -151,5 +153,15 @@ def do_something():
     pprint(list(rdb.lrange(QUEUE_KEY, 0, -1)))  # DELETEME
 
 
+def only_send():
+    """Hack to give a way to only send from the queue"""
+    r_url = env.require('REDISCLOUD_URL')
+    rdb = redis.StrictRedis.from_url(r_url)
+    send(rdb)
+
+
 if __name__ == '__main__':
-    do_something()
+    if 'only-send' in sys.argv[1:]:
+        only_send()
+    else:
+        do_something()
