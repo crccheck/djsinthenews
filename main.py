@@ -87,6 +87,19 @@ def queue(rdb, text):
     rdb.rpush(QUEUE_KEY, text)
 
 
+def send(rdb):
+    """Send a tweet from the queue."""
+    n_queue = rdb.llen(QUEUE_KEY)
+    if n_queue:
+        text = rdb.lpop(QUEUE_KEY)
+        try:
+            send_tweet(text)
+        except tweepy.TweepError:
+            # code 226 - this request looks like it might be automated
+            rdb.lpush(text)
+        print 'Tweets in the queue: {}'.format(n_queue - 1)
+
+
 def do_something():
     headlines = build_headlines()
     maybe_better_headlines = {}
@@ -125,18 +138,12 @@ def do_something():
             else:
                 break
 
-    # send tweet off the queue
     if 'send' in sys.argv[1:]:
-        n_queue = rdb.llen(QUEUE_KEY)
-        if n_queue:
-            text = rdb.lpop(QUEUE_KEY)
-            try:
-                send_tweet(text)
-            except tweepy.TweepError as e:
-                # code 226 - this request looks like it might be automated
-                rdb.lpush(text)
-                import ipdb; ipdb.set_trace()
-            print 'Tweets in the queue: {}'.format(n_queue - 1)
+        try:
+            send(rdb)
+        except tweepy.TweepError as e:
+            # TODO figure out error code, need json?
+            import ipdb; ipdb.set_trace()
 
     # DELETEME below, just for debuggin
     print 'queue:'
