@@ -42,12 +42,17 @@ def build_headlines(url='https://news.google.com/'):
     page = requests.get(url, headers={
         'User-Agent': 'djs-everywhere/0.0.0 (c@crccheck.com)',
     })
+    if not page.ok:
+        print page
+        logger.warning("That's not good")
+        raise Exception('TODO page did not load error')
     doc = document_fromstring(page.content)
     headlines = {}
     for headline in doc.xpath('//a/span[@class="titletext"]'):
         # lxml returns byte string
         key = unicode(headline.text_content().strip())
         # WISHLIST strip google news get params
+        # * ?google_editors_picks=true
         url = headline.getparent().attrib['href']
         headlines[key] = url
     return headlines
